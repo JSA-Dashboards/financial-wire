@@ -144,7 +144,7 @@ else:
         sec("Market snapshot" + (f" · Bloomberg, {wire['snapshotAsOf']}" if wire.get("snapshotAsOf") else ""))
         for col, s in zip(st.columns(len(snap)), snap):
             col.markdown(tile(s["name"], s["level"], s["change"]), unsafe_allow_html=True)
-    futs = (payloads.get("mkts") or {}).get("data") or []
+    futs = build_fin_wire.order_futures((payloads.get("mkts") or {}).get("data"))
     if futs:
         sec(f"Nearby futures · settlements {futs[0].get('asof', '')} · change in contract units")
         for i in range(0, len(futs), 5):   # five tiles a row; 9 in one row is too narrow to read

@@ -106,9 +106,19 @@ def macro(d: dict) -> str:
         f'<tr><td style="{FONT}font-size:11px;color:{MUTED};">PJ Quaid, StoneX</td></tr>'
 
 
+FUT_ORDER = ["Corn", "Chicago ethanol (Platts fut)", "Soybeans", "Board crush", "Soybean meal",
+             "Soybean oil", "SRW wheat", "HRW wheat", "Live cattle"]
+
+
+def order_futures(rows: list) -> list:
+    """Display order for the nearby table; anything not listed goes last, in its original order."""
+    rank = {n: i for i, n in enumerate(FUT_ORDER)}
+    return sorted(rows or [], key=lambda r: rank.get(r.get("name"), len(FUT_ORDER)))
+
+
 def futures(d: dict) -> str:
     """Nearby futures: last settle; day/week change nominal; month/year change nominal with % in ( )."""
-    rows = d.get("futures") or []
+    rows = order_futures(d.get("futures"))
     if not rows:
         return ""
     base = f"padding:8px 4px;border-bottom:1px solid {RULE};{FONT}font-size:14px;"
