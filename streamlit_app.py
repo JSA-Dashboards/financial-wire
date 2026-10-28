@@ -64,6 +64,12 @@ def sec(text: str):
     st.markdown(f'<div class="sec-header">{html.escape(text)}</div>', unsafe_allow_html=True)
 
 
+def _md(parts: tuple[str, str]) -> str:
+    """Markdown with the first sentence bold; $ escaped so pairs of prices don't render as LaTeX."""
+    first, rest = (p.replace("$", "\\$") for p in parts)
+    return f"**{first}**" + (f" {rest}" if rest else "")
+
+
 def tile(name: str, level: str, change: str) -> str:
     col = build_fin_wire.change_color(name, change)
     col = COL_POS if col == build_fin_wire.GREEN else COL_NEG
@@ -105,6 +111,10 @@ st.markdown(f'<div class="asof">Source: <b>{html.escape(origin)}</b>'
 if not wire:
     st.warning("No wire data yet. Run push_wire.py on the PC that has Outlook.")
 else:
+    if wire.get("history"):
+        sec("Today in markets history")
+        with st.container(border=True):
+            st.markdown(_md(build_fin_wire.split_first(wire["history"])))
     snap = wire.get("snapshot") or []
     if snap:
         sec("Market snapshot" + (f" · Bloomberg, {wire['snapshotAsOf']}" if wire.get("snapshotAsOf") else ""))
@@ -130,7 +140,8 @@ def picker():
         group = [i for i in items if i["topic"] == t]
         with st.expander(f"{t} ({len(group)})", expanded=t in ("PJ Quaid", "Bloomberg Markets Daily")):
             for n, it in enumerate(group):
-                label = it["title"] if len(it["title"]) < 400 else it["title"][:397] + "..."
+                title = it["title"] if len(it["title"]) < 400 else it["title"][:397] + "..."
+                label = _md(build_fin_wire.split_first(title))
                 tail = f"  \n:gray[{it['source']} · {it['when']}]"
                 link = f" [:material/open_in_new:]({it['link']})" if it.get("link") else ""
                 if st.checkbox(label + link + tail, key=f"{t}-{n}"):

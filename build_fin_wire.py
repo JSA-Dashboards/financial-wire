@@ -15,7 +15,7 @@ from datetime import datetime
 from pathlib import Path
 
 HERE = Path(__file__).parent
-SECTION_ORDER = ["snapshot", "reading", "macro", "headlines", "history"]  # reorder freely
+SECTION_ORDER = ["history", "snapshot", "reading", "macro", "headlines"]  # reorder freely
 
 INK, ACCENT, MUTED, RULE = "#32373c", "#5e7164", "#5f7267", "#d7e2dc"   # JSA green, as the COT dashboard
 GREEN, RED, AMBER = "#2e7d32", "#c62828", "#b26a00"
@@ -24,6 +24,34 @@ FONT = "font-family:Arial,Helvetica,sans-serif;"
 
 def esc(s: str) -> str:
     return html.escape(s or "", quote=True)
+
+
+_ABBR = {"u.s", "u.k", "inc", "corp", "co", "ltd", "jr", "sr", "st", "no", "vs", "mr", "mrs", "dr", "gov",
+         "sen", "rep", "sec", "mt", "e.g", "i.e", "jan", "feb", "mar", "apr", "aug", "sept", "oct", "nov",
+         "dec", "a.m", "p.m", "approx", "est"}
+
+
+def split_first(text: str) -> tuple[str, str]:
+    """(first sentence, the rest). Skips U.S., Inc., single initials and decimals; if there is
+    no second sentence the whole text is the first."""
+    for m in re.finditer(r'[.!?]["”\')]*\s+', text):
+        i = m.start()
+        nxt = text[m.end():m.end() + 1]
+        if not nxt or nxt.islower():
+            continue
+        if text[i] == ".":
+            tok = re.search(r"[\w.]+$", text[:i])
+            tok = tok.group(0).lower() if tok else ""
+            if tok in _ABBR or len(tok) == 1:
+                continue
+        return text[:m.end()].rstrip(), text[m.end():]
+    return text, ""
+
+
+def bold_first(text: str) -> str:
+    """HTML-escaped text with the first sentence in <b>."""
+    first, rest = split_first(text or "")
+    return f"<b>{esc(first)}</b>" + (f" {esc(rest)}" if rest else "")
 
 
 def heading(text: str) -> str:
@@ -73,7 +101,7 @@ def macro(d: dict) -> str:
     paras = d.get("macro") or []
     if not paras:
         return ""
-    ps = "".join(f'<p style="margin:0 0 12px 0;">{esc(p)}</p>' for p in paras)
+    ps = "".join(f'<p style="margin:0 0 12px 0;">{bold_first(p)}</p>' for p in paras)
     return heading("Macro & Ag Read") + row(ps) + \
         f'<tr><td style="{FONT}font-size:11px;color:{MUTED};">PJ Quaid, StoneX</td></tr>'
 
@@ -83,7 +111,7 @@ def headlines_section(d: dict) -> str:
     items = d.get("headlines") or []
     if not items:
         return ""
-    lis = "".join(f'<li style="padding:3px 0;">{esc(i)}</li>' for i in items)
+    lis = "".join(f'<li style="padding:3px 0;">{bold_first(i)}</li>' for i in items)
     return heading("Headlines") + row(f'<ul style="margin:0;padding-left:20px;">{lis}</ul>')
 
 
