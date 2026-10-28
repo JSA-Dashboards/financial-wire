@@ -133,67 +133,61 @@ else:
         st.caption(f":material/warning: {g}")
 
 
-@st.fragment
-def picker():
-    """Ticking reruns only this fragment, not the whole page."""
-    feed_items, feed_errors = load_feeds()
-    items = list((payloads.get("pj") or {}).get("data") or []) + \
-        list((payloads.get("bbg") or {}).get("data") or []) + feed_items
-    if not items:
-        st.info("No candidates yet.")
-        return
+# -- ticks live in session_state, so they are known before anything below is drawn ----------
+feed_items, feed_errors = load_feeds()
+items = list((payloads.get("pj") or {}).get("data") or []) + \
+    list((payloads.get("bbg") or {}).get("data") or []) + feed_items
+topics = list(dict.fromkeys(i["topic"] for i in items))
+groups = {t: [i for i in items if i["topic"] == t] for t in topics}
+picked = [it for t in topics for n, it in enumerate(groups[t]) if st.session_state.get(f"{t}-{n}")]
 
-    topics = list(dict.fromkeys(i["topic"] for i in items))
-    picked = []
-    for t in topics:
-        group = [i for i in items if i["topic"] == t]
-        with st.expander(f"{t} ({len(group)})", expanded=t in ("PJ Quaid", "Bloomberg Markets Daily")):
-            for n, it in enumerate(group):
-                title = it["title"] if len(it["title"]) < 400 else it["title"][:397] + "..."
-                label = _md(build_fin_wire.split_first(title))
-                tail = f"  \n:gray[{it['source']} · {it['when']}]"
-                link = f" [:material/open_in_new:]({it['link']})" if it.get("link") else ""
-                if st.checkbox(label + link + tail, key=f"{t}-{n}"):
-                    picked.append(it)
+entries = []   # {"title": "Headline (Source)", "summary": "...", "note": None | "..."}
+for p in picked:
+    entry = {"title": f"{p['title']} ({p['source']})", "summary": "", "note": None, "basis": ""}
+    if p.get("link"):
+        with st.spinner(f"Summarizing: {p['title'][:60]}"):
+            try:
+                r = get_summary(p["title"], p["link"], p["source"], p.get("blurb", ""))
+                entry["summary"], entry["basis"] = r["summary"], r["basis"]
+            except Exception as e:
+                entry["note"] = str(e)
+    entries.append(entry)
 
-    sec(f"Ticked ({len(picked)})")
-    entries = []   # {"title": "Headline (Source)", "summary": "..."}
-    for p in picked:
-        entry = {"title": f"{p['title']} ({p['source']})", "summary": ""}
-        if p.get("link"):
-            with st.spinner(f"Summarizing: {p['title'][:60]}"):
-                try:
-                    r = get_summary(p["title"], p["link"], p["source"], p.get("blurb", ""))
-                except Exception as e:
-                    r = {"summary": "", "basis": "", "error": str(e)}
-            entry["summary"] = r["summary"]
-            if r["summary"]:
-                body = r["summary"].replace("$", "\\$")
-                st.markdown("\n\n".join([f"**{p['title'][:90]}**", body, f":gray[summary from the {r['basis']}]"]))
-            elif r["error"]:
-                st.caption(f":material/warning: no summary for \"{p['title'][:60]}\": {r['error']}")
-        entries.append(entry)
-    if entries:
-        text = "\n".join(
-            f"• {e['title']}" + ("\n  " + e["summary"] if e["summary"] else "") for e in entries)
-        st.code(text, language=None, wrap_lines=True)
-    bullets = entries
-    if wire:
-        st.download_button(
-            "Outlook draft: Financial News", data=outlook_draft(wire, bullets, (wire or {}).get("recipient", "")),
-            file_name="Financial News.eml", mime="message/rfc822", icon=":material/mail:", type="primary",
-            help="Opens in Outlook as an editable draft with the wire plus your ticked headlines.")
-    for e in feed_errors:
-        st.caption(f":material/warning: feed failed: {e}")
+# -- the wire, full width, with the Outlook button just under it -------------------------
+sec("Today's wire")
+if wire:
+    with st.container(border=True):
+        st.iframe(build_fin_wire.build(dict(wire, headlines=entries)), height=1400)
+    st.download_button(
+        "Create Outlook template", data=outlook_draft(wire, entries, wire.get("recipient", "")),
+        file_name="Financial News.eml", mime="message/rfc822", icon=":material/mail:", type="primary",
+        help="Opens in Outlook as an editable draft, subject 'Financial News', with the wire plus your ticked headlines.")
+else:
+    st.info("No wire yet.")
 
+# -- headline candidates below ----------------------------------------------------------
+sec("Headline candidates")
+st.caption("Tick what matters. Ticked items appear in the wire above and in the Outlook template.")
+if not items:
+    st.info("No candidates yet.")
+for t in topics:
+    group = groups[t]
+    with st.expander(f"{t} ({len(group)})", expanded=t in ("PJ Quaid", "Bloomberg Markets Daily")):
+        for n, it in enumerate(group):
+            title = it["title"] if len(it["title"]) < 400 else it["title"][:397] + "..."
+            tail = f"  \n:gray[{it['source']} \u00b7 {it['when']}]"
+            link = f" [:material/open_in_new:]({it['link']})" if it.get("link") else ""
+            st.checkbox(_md(build_fin_wire.split_first(title)) + link + tail, key=f"{t}-{n}")
 
-left, right = st.columns([5, 6], gap="large")
-with left:
-    sec("Today's wire")
-    if wire:
-        with st.container(border=True):
-            st.iframe(build_fin_wire.build(wire), height=1400)
-with right:
-    sec("Headline candidates")
-    st.caption("Tick what matters. Copy the list, or download the Outlook draft with it already in the wire.")
-    picker()
+if entries:
+    sec(f"Ticked ({len(entries)})")
+    for e in entries:
+        if e["note"]:
+            st.caption(f":material/warning: no summary for \"{e['title'][:60]}\": {e['note']}")
+        elif e["summary"]:
+            st.markdown("\n\n".join([f"**{e['title'][:90]}**", e["summary"].replace("$", "\\$"),
+                                     f":gray[summary from the {e['basis']}]"]))
+    st.code("\n".join(f"\u2022 {e['title']}" + ("\n  " + e["summary"] if e["summary"] else "") for e in entries),
+            language=None, wrap_lines=True)
+for e in feed_errors:
+    st.caption(f":material/warning: feed failed: {e}")
