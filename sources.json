@@ -1,0 +1,30 @@
+{
+  "_comment": "Senders that feed the Morning Financial Wire. 'match' = sender name/email substring, 'subjectAny' = regex list. 'role' says which part of the wire the email feeds: snapshot (market table), reading (reading list), history (Today in Markets History), macro (PJ's ag-read paragraphs). Newest message per source wins.",
+
+  "recipient": "kpostin@jpsi.com",
+  "subjectPrefix": "Morning Financial Wire",
+
+  "sources": [
+    {
+      "key": "bloomberg",
+      "label": "Bloomberg Markets Daily",
+      "match": "news.bloomberg.com",
+      "subjectAny": ["Markets Daily"],
+      "role": "snapshot"
+    },
+    {
+      "key": "wsj",
+      "label": "WSJ Markets A.M.",
+      "match": "interactive.wsj.com",
+      "subjectAny": ["Markets A\\.M\\."],
+      "role": "reading+history"
+    },
+    {
+      "key": "pj",
+      "label": "PJ Quaid first look",
+      "match": "Quaid",
+      "subjectAny": ["^\\s*(RE:|FW:|FWD:)?\\s*first look"],
+      "role": "macro"
+    }
+  ]
+}

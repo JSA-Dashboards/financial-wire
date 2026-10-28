@@ -1,0 +1,11 @@
+.env
+*.p8
+*.pem
+.streamlit/secrets.toml
+__pycache__/
+fin_input.json
+fin_output.html
+pj_candidates.json
+bbg_candidates.json
+headline_candidates.json
+headline_candidates.html

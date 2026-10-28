@@ -1,0 +1,32 @@
+-- One-time setup for the Morning Financial Wire app. Run in Snowsight as ACCOUNTADMIN
+-- (account JSA-ANALYTICS). Mirrors the RIVER_FOB_SVC pattern: a dedicated key-pair
+-- service user whose role can touch only this database.
+
+CREATE DATABASE IF NOT EXISTS FIN_WIRE;
+CREATE SCHEMA   IF NOT EXISTS FIN_WIRE.PUBLIC;
+
+CREATE TABLE IF NOT EXISTS FIN_WIRE.PUBLIC.WIRE_PAYLOAD (
+    AS_OF     DATE          NOT NULL,   -- Central-time date of the wire
+    KIND      VARCHAR(16)   NOT NULL,   -- 'wire' | 'pj' | 'bbg'
+    PAYLOAD   VARCHAR       NOT NULL,   -- JSON text
+    PUSHED_AT TIMESTAMP_NTZ NOT NULL DEFAULT CURRENT_TIMESTAMP()
+);
+
+CREATE ROLE IF NOT EXISTS FIN_WIRE_ROLE;
+GRANT USAGE ON WAREHOUSE COMPUTE_WH            TO ROLE FIN_WIRE_ROLE;
+GRANT USAGE ON DATABASE  FIN_WIRE              TO ROLE FIN_WIRE_ROLE;
+GRANT USAGE ON SCHEMA    FIN_WIRE.PUBLIC       TO ROLE FIN_WIRE_ROLE;
+GRANT SELECT, INSERT, DELETE ON ALL TABLES IN SCHEMA FIN_WIRE.PUBLIC TO ROLE FIN_WIRE_ROLE;
+GRANT SELECT, INSERT, DELETE ON FUTURE TABLES IN SCHEMA FIN_WIRE.PUBLIC TO ROLE FIN_WIRE_ROLE;
+
+-- Generate a key pair first (PowerShell, in ~/.snowflake):
+--   openssl genrsa 2048 | openssl pkcs8 -topk8 -nocrypt -inform PEM -out fin_wire_svc.p8
+--   openssl rsa -in fin_wire_svc.p8 -pubout -out fin_wire_svc.pub
+-- then paste the public key below WITHOUT the BEGIN/END lines.
+CREATE USER IF NOT EXISTS FIN_WIRE_SVC
+    TYPE = SERVICE
+    DEFAULT_ROLE = FIN_WIRE_ROLE
+    DEFAULT_WAREHOUSE = COMPUTE_WH
+    RSA_PUBLIC_KEY = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwgwa/V8yVOnEQI5FVQNBTfKhogfxuj3hxkd63PWyJPszNiqMQdXN28i3ldLCNdzpTUjT0kgn+gAWpRT+7T6XvkdSfhIAoJWW+6NV2hVVG9+EIDdRFiRAndCZ34aRfDbAw5bKIv7lAooz1CRQOTG4NXnqhdbRm9wGyRT4FXuBPLpW7UzJP50+aVsv5Cai7hxvy4uSgorwxggjlY8/IJ5YHJVz7u3lWrpATW7TruE2GUS+Cij9A2RZWXsFd/fkgEZC1Sa7YEYqar46lP/gTJzXfDhvtSqokS20VtNFg5+xnqfPrgYVvYGBvJWxDGY4wN+P7WiL7Mr+nYpwgtfL2K8vyQIDAQAB';
+GRANT ROLE FIN_WIRE_ROLE TO USER FIN_WIRE_SVC;
+
