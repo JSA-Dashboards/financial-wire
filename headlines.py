@@ -84,7 +84,9 @@ def parse(xml_bytes: bytes):
             when = parsedate_to_datetime(it.findtext("pubDate") or "")
         except Exception:
             when = None
-        yield title.strip(), source.strip(), link, when
+        desc = re.sub(r"<[^>]+>", " ", html.unescape(it.findtext("description") or ""))
+        desc = re.sub(r"\s+", " ", desc).strip()
+        yield title.strip(), source.strip(), link, when, desc
 
 
 def collect(include_mailbox=True):
@@ -99,7 +101,7 @@ def collect(include_mailbox=True):
     for topic, label, url in FEEDS:
         try:
             n = 0
-            for title, source, link, when in parse(fetch(url)):
+            for title, source, link, when, desc in parse(fetch(url)):
                 if n >= PER_FEED:
                     break
                 if when and when.astimezone(timezone.utc) < cutoff:
@@ -110,7 +112,9 @@ def collect(include_mailbox=True):
                 seen.add(k)
                 n += 1
                 out.append({"topic": topic, "feed": label, "title": title, "source": source or label,
-                            "link": link, "when": when.astimezone().strftime("%a %H:%M") if when else ""})
+                            "link": link, "when": when.astimezone().strftime("%a %H:%M") if when else "",
+                            # Google News descriptions just repeat the headline; only direct feeds carry a blurb
+                            "blurb": "" if "news.google.com" in url else desc})
         except Exception as e:  # one dead feed shouldn't sink the page
             errors.append(f"{label}: {e}")
     return out, errors

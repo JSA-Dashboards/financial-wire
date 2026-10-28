@@ -107,11 +107,16 @@ def macro(d: dict) -> str:
 
 
 def headlines_section(d: dict) -> str:
-    """Ticked headline candidates, passed in by the app (never read from a feed here)."""
+    """Ticked headline candidates, passed in by the app (never read from a feed here).
+    Each item is a string, or {"title", "summary"} for a headline with a written summary."""
     items = d.get("headlines") or []
     if not items:
         return ""
-    lis = "".join(f'<li style="padding:3px 0;">{bold_first(i)}</li>' for i in items)
+    lis = ""
+    for i in items:
+        title, summ = (i.get("title", ""), i.get("summary", "")) if isinstance(i, dict) else (i, "")
+        sub = (f'<div style="margin-top:3px;font-weight:normal;">{esc(summ)}</div>' if summ else "")
+        lis += f'<li style="padding:5px 0;">{bold_first(title)}{sub}</li>'
     return heading("Headlines") + row(f'<ul style="margin:0;padding-left:20px;">{lis}</ul>')
 
 

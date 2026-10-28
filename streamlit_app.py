@@ -16,6 +16,7 @@ import streamlit as st
 
 import build_fin_wire
 import headlines
+import summarize
 import wire_store
 
 st.set_page_config(page_title="Morning Financial Wire", page_icon=":material/newspaper:", layout="wide")
@@ -78,7 +79,7 @@ def tile(name: str, level: str, change: str) -> str:
             f'<div class="tile-delta" style="color:{col}">{html.escape(change)}</div></div>')
 
 
-def outlook_draft(wire: dict, picked: list[str], recipient: str) -> bytes:
+def outlook_draft(wire: dict, picked: list, recipient: str) -> bytes:
     """An .eml flagged X-Unsent: Outlook opens it as an editable draft, subject 'Financial News'."""
     data = dict(wire, headlines=picked)
     msg = EmailMessage()
@@ -94,6 +95,14 @@ def outlook_draft(wire: dict, picked: list[str], recipient: str) -> bytes:
 @st.cache_data(ttl=300, show_spinner="Loading the wire...")
 def load_payloads():
     return wire_store.read_latest()
+
+
+@st.cache_data(ttl=86400, show_spinner=False, max_entries=500)
+def get_summary(title: str, link: str, source: str, blurb: str) -> dict:
+    r = summarize.summarize(title, link, source, blurb)
+    if not r["summary"]:
+        raise RuntimeError(r["error"] or "no summary")   # exceptions are not cached, so a fixed key works at once
+    return r
 
 
 @st.cache_data(ttl=900, show_spinner="Fetching news feeds...")
@@ -148,9 +157,27 @@ def picker():
                     picked.append(it)
 
     sec(f"Ticked ({len(picked)})")
-    bullets = [f"{p['title']} ({p['source']})" for p in picked]
-    if bullets:
-        st.code("\n".join(f"• {b}" for b in bullets), language=None, wrap_lines=True)
+    entries = []   # {"title": "Headline (Source)", "summary": "..."}
+    for p in picked:
+        entry = {"title": f"{p['title']} ({p['source']})", "summary": ""}
+        if p.get("link"):
+            with st.spinner(f"Summarizing: {p['title'][:60]}"):
+                try:
+                    r = get_summary(p["title"], p["link"], p["source"], p.get("blurb", ""))
+                except Exception as e:
+                    r = {"summary": "", "basis": "", "error": str(e)}
+            entry["summary"] = r["summary"]
+            if r["summary"]:
+                body = r["summary"].replace("$", "\\$")
+                st.markdown("\n\n".join([f"**{p['title'][:90]}**", body, f":gray[summary from the {r['basis']}]"]))
+            elif r["error"]:
+                st.caption(f":material/warning: no summary for \"{p['title'][:60]}\": {r['error']}")
+        entries.append(entry)
+    if entries:
+        text = "\n".join(
+            f"• {e['title']}" + ("\n  " + e["summary"] if e["summary"] else "") for e in entries)
+        st.code(text, language=None, wrap_lines=True)
+    bullets = entries
     if wire:
         st.download_button(
             "Outlook draft: Financial News", data=outlook_draft(wire, bullets, (wire or {}).get("recipient", "")),

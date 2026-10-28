@@ -2,3 +2,5 @@ streamlit>=1.56
 snowflake-connector-python>=3.7
 cryptography
 python-dotenv
+anthropic
+googlenewsdecoder
