@@ -54,6 +54,27 @@ def bold_first(text: str) -> str:
     return f"<b>{esc(first)}</b>" + (f" {esc(rest)}" if rest else "")
 
 
+_SMALL = {"a", "an", "and", "as", "at", "but", "by", "for", "in", "of", "on", "or", "the", "to", "vs"}
+
+
+def title_case(text: str) -> str:
+    """Title Case for labels: small words stay lower (not first), and anything already containing a
+    capital (US, SRW, McBee) is left alone. Hyphenated parts are handled one by one (10-Year)."""
+    def fix(tok: str, first: bool) -> str:
+        if any(c.isupper() for c in tok) or any(c.isdigit() for c in tok):
+            return tok
+        if not first and tok.lower() in _SMALL:
+            return tok
+        for i, c in enumerate(tok):
+            if c.isalpha():
+                return tok[:i] + c.upper() + tok[i + 1:]
+        return tok
+    out = []
+    for i, w in enumerate((text or "").split(" ")):
+        out.append("-".join(fix(p, i == 0 and j == 0) for j, p in enumerate(w.split("-"))))
+    return " ".join(out)
+
+
 def heading(text: str) -> str:
     return (f'<tr><td style="padding:22px 0 6px 0;{FONT}font-size:18px;font-weight:bold;'
             f'color:{INK};border-bottom:2px solid {ACCENT};">{esc(text)}</td></tr>')
@@ -79,7 +100,7 @@ def snapshot(d: dict) -> str:
     for r in rows:
         col = change_color(r["name"], r["change"])
         body += (f'<tr><td style="padding:9px 4px;border-bottom:1px solid {RULE};{FONT}font-size:14px;'
-                 f'font-weight:bold;color:{INK};">{esc(r["name"])}</td>'
+                 f'font-weight:bold;color:{INK};">{esc(title_case(r["name"]))}</td>'
                  f'<td align="right" style="padding:9px 4px;border-bottom:1px solid {RULE};{FONT}font-size:14px;'
                  f'color:{INK};">{esc(r["level"])}</td>'
                  f'<td align="right" style="padding:9px 4px;border-bottom:1px solid {RULE};{FONT}font-size:14px;'
@@ -137,7 +158,7 @@ def futures(d: dict) -> str:
     body = ""
     for r in rows:
         dec = r.get("decimals", 2)
-        body += (f'<tr><td style="{base}font-weight:bold;color:{INK};">{esc(r["name"])} '
+        body += (f'<tr><td style="{base}font-weight:bold;color:{INK};">{esc(title_case(r["name"]))} '
                  f'<span style="font-weight:normal;color:{MUTED};font-size:11px;">{esc(r["ticker"])}</span></td>'
                  f'<td align="right" style="{base}color:{INK};">{r["last"]:.{dec}f} '
                  f'<span style="color:{MUTED};font-size:11px;">{esc(r["unit"])}</span></td>'

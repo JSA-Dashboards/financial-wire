@@ -50,7 +50,7 @@ FEEDS = [
      gnews('(ethanol OR RFS OR "renewable volume obligations" OR E15 OR 45Z OR "SAF")')),
     ("Biofuels", "Biodiesel / soybean oil",
      gnews('("renewable diesel" OR biodiesel OR "soybean oil" OR "crush margins" OR "biomass-based diesel")')),
-    ("Macro for ag", "Fed, dollar, energy",
+    ("Macro for Ag", "Fed, dollar, energy",
      gnews('(site:reuters.com OR site:bloomberg.com OR site:wsj.com) (Fed OR "Treasury yields" OR "dollar index" OR "crude oil" OR Hormuz)')),
     ("Livestock", "Cattle & beef",
      gnews('(cattle OR "beef prices" OR "feeder cattle" OR "screwworm" OR "packer") (futures OR herd OR imports OR plant)')),

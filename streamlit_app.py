@@ -74,7 +74,7 @@ def _md(parts: tuple[str, str]) -> str:
 def tile(name: str, level: str, change: str) -> str:
     col = build_fin_wire.change_color(name, change)
     col = COL_POS if col == build_fin_wire.GREEN else COL_NEG
-    return (f'<div class="tile"><div class="tile-label">{html.escape(name)}</div>'
+    return (f'<div class="tile"><div class="tile-label">{html.escape(build_fin_wire.title_case(name))}</div>'
             f'<div class="tile-value">{html.escape(level)}</div>'
             f'<div class="tile-delta" style="color:{col}">{html.escape(change)}</div></div>')
 
@@ -114,7 +114,7 @@ def fut_tile(r: dict) -> str:
         col = COL_POS if v > 0 else COL_NEG if v < 0 else DM_MUTED
         extra = f" ({pct:+.1f}%)" if pct is not None else ""
         return f'<div class="tile-sub">{label} <b style="color:{col}">{v:+.{dec}f}{extra}</b></div>'
-    return (f'<div class="tile"><div class="tile-label">{html.escape(r["name"])} · {html.escape(r["ticker"])}</div>'
+    return (f'<div class="tile"><div class="tile-label">{html.escape(build_fin_wire.title_case(r["name"]))} · {html.escape(r["ticker"])}</div>'
             f'<div class="tile-value">{r["last"]:.{dec}f}</div>'
             f'<div class="tile-sub">{html.escape(r["unit"])}</div>{line("Day", r.get("day"))}{line("Week", r.get("week"))}'
             f'{line("Month", r.get("month"), r.get("month_pct"))}{line("Year", r.get("year"), r.get("year_pct"))}</div>')
@@ -136,17 +136,17 @@ if not wire:
     st.warning("No wire data yet. Run push_wire.py on the PC that has Outlook.")
 else:
     if wire.get("history"):
-        sec("Today in markets history")
+        sec("Today in Markets History")
         with st.container(border=True):
             st.markdown(_md(build_fin_wire.split_first(wire["history"])))
     snap = wire.get("snapshot") or []
     if snap:
-        sec("Market snapshot" + (f" · Bloomberg, {wire['snapshotAsOf']}" if wire.get("snapshotAsOf") else ""))
+        sec("Market Snapshot" + (f" · Bloomberg, {wire['snapshotAsOf']}" if wire.get("snapshotAsOf") else ""))
         for col, s in zip(st.columns(len(snap)), snap):
             col.markdown(tile(s["name"], s["level"], s["change"]), unsafe_allow_html=True)
     futs = build_fin_wire.order_futures((payloads.get("mkts") or {}).get("data"))
     if futs:
-        sec(f"Nearby futures · settlements {futs[0].get('asof', '')} · change in contract units")
+        sec(f"Nearby Futures · Settlements {futs[0].get('asof', '')} · Change in Contract Units")
         for i in range(0, len(futs), 5):   # five tiles a row; 9 in one row is too narrow to read
             chunk = futs[i:i + 5]
             for col, r in zip(st.columns(5), chunk):
@@ -176,7 +176,7 @@ for p in picked:
     entries.append(entry)
 
 # -- the wire, full width, with the Outlook button just under it -------------------------
-sec("Today's wire")
+sec("Today's Wire")
 if wire:
     with st.container(border=True):
         st.iframe(build_fin_wire.build(dict(wire, headlines=entries, futures=futs)), height=1400)
@@ -188,7 +188,7 @@ else:
     st.info("No wire yet.")
 
 # -- headline candidates below ----------------------------------------------------------
-sec("Headline candidates")
+sec("Headline Candidates")
 st.caption("Tick what matters. Ticked items appear in the wire above and in the Outlook template.")
 if not items:
     st.info("No candidates yet.")
