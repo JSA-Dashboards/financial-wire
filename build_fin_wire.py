@@ -107,34 +107,39 @@ def macro(d: dict) -> str:
 
 
 def futures(d: dict) -> str:
-    """Nearby futures: last settle, day and week change in the contract's own units (not %)."""
+    """Nearby futures: last settle; day/week change nominal; month/year change nominal with % in ( )."""
     rows = d.get("futures") or []
     if not rows:
         return ""
+    base = f"padding:8px 4px;border-bottom:1px solid {RULE};{FONT}font-size:14px;"
     th = (f'style="padding:6px 4px;border-bottom:2px solid {RULE};{FONT}font-size:11px;color:{MUTED};'
           f'text-transform:uppercase;letter-spacing:.06em;"')
-    head = (f'<tr><td {th}>Nearby</td><td align="right" {th}>Last</td>'
-            f'<td align="right" {th}>Day</td><td align="right" {th}>Week</td></tr>')
+    head = (f'<tr><td {th}>Nearby</td>' +
+            "".join(f'<td align="right" {th}>{h}</td>' for h in ("Last", "Day", "Week", "Month (%)", "Year (%)")) + '</tr>')
+
+    def cell(v, dec, pct=None):
+        if v is None:
+            return f'<td align="right" style="{base}color:{MUTED};">n/a</td>'
+        col = GREEN if v > 0 else RED if v < 0 else INK
+        txt = f"{v:+.{dec}f}" + (f" ({pct:+.1f}%)" if pct is not None else "")
+        return f'<td align="right" style="{base}font-weight:bold;color:{col};">{txt}</td>'
+
     body = ""
     for r in rows:
         dec = r.get("decimals", 2)
-
-        def cell(v):
-            if v is None:
-                return f'<td align="right" style="padding:8px 4px;border-bottom:1px solid {RULE};{FONT}font-size:14px;color:{MUTED};">n/a</td>'
-            col = GREEN if v > 0 else RED if v < 0 else INK
-            return (f'<td align="right" style="padding:8px 4px;border-bottom:1px solid {RULE};{FONT}font-size:14px;'
-                    f'font-weight:bold;color:{col};">{v:+.{dec}f}</td>')
-        body += (f'<tr><td style="padding:8px 4px;border-bottom:1px solid {RULE};{FONT}font-size:14px;font-weight:bold;'
-                 f'color:{INK};">{esc(r["name"])} <span style="font-weight:normal;color:{MUTED};font-size:11px;">'
-                 f'{esc(r["ticker"])}</span></td>'
-                 f'<td align="right" style="padding:8px 4px;border-bottom:1px solid {RULE};{FONT}font-size:14px;color:{INK};">'
-                 f'{r["last"]:.{dec}f} <span style="color:{MUTED};font-size:11px;">{esc(r["unit"])}</span></td>'
-                 f'{cell(r.get("day"))}{cell(r.get("week"))}</tr>')
+        body += (f'<tr><td style="{base}font-weight:bold;color:{INK};">{esc(r["name"])} '
+                 f'<span style="font-weight:normal;color:{MUTED};font-size:11px;">{esc(r["ticker"])}</span></td>'
+                 f'<td align="right" style="{base}color:{INK};">{r["last"]:.{dec}f} '
+                 f'<span style="color:{MUTED};font-size:11px;">{esc(r["unit"])}</span></td>'
+                 f'{cell(r.get("day"), dec)}{cell(r.get("week"), dec)}'
+                 f'{cell(r.get("month"), dec, r.get("month_pct"))}{cell(r.get("year"), dec, r.get("year_pct"))}</tr>')
     asof = esc(rows[0].get("asof", ""))
     note = (f'<div style="{FONT}font-size:11px;color:{MUTED};padding-top:4px;">Settlements as of {asof}. '
-            f'Change in each contract\'s own units (&cent;/bu, $/st, &cent;/lb); week = five sessions, same contract.</div>')
-    return heading("Nearby Futures") + row(f'<table width="100%" cellpadding="0" cellspacing="0">{head}{body}</table>{note}', "6px 0 0 0")
+            f'Change in each contract\'s own units (&cent;/bu, $/st, &cent;/lb); all on the same contract, '
+            f'so a roll is never a move. Week = 5 sessions, month = 30 days, year = 365 days. '
+            f'Ethanol is the CME Chicago (Platts) futures, a proxy for the assessment.</div>')
+    return heading("Nearby Futures") + row(
+        f'<table width="100%" cellpadding="0" cellspacing="0">{head}{body}</table>{note}', "6px 0 0 0")
 
 
 def headlines_section(d: dict) -> str:

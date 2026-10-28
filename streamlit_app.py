@@ -108,14 +108,16 @@ def get_summary(title: str, link: str, source: str, blurb: str) -> dict:
 def fut_tile(r: dict) -> str:
     dec = r.get("decimals", 2)
 
-    def line(label, v):
+    def line(label, v, pct=None):
         if v is None:
             return f'<div class="tile-sub">{label} n/a</div>'
         col = COL_POS if v > 0 else COL_NEG if v < 0 else DM_MUTED
-        return f'<div class="tile-sub">{label} <b style="color:{col}">{v:+.{dec}f}</b></div>'
+        extra = f" ({pct:+.1f}%)" if pct is not None else ""
+        return f'<div class="tile-sub">{label} <b style="color:{col}">{v:+.{dec}f}{extra}</b></div>'
     return (f'<div class="tile"><div class="tile-label">{html.escape(r["name"])} · {html.escape(r["ticker"])}</div>'
             f'<div class="tile-value">{r["last"]:.{dec}f}</div>'
-            f'<div class="tile-sub">{html.escape(r["unit"])}</div>{line("Day", r.get("day"))}{line("Week", r.get("week"))}</div>')
+            f'<div class="tile-sub">{html.escape(r["unit"])}</div>{line("Day", r.get("day"))}{line("Week", r.get("week"))}'
+            f'{line("Month", r.get("month"), r.get("month_pct"))}{line("Year", r.get("year"), r.get("year_pct"))}</div>')
 
 
 @st.cache_data(ttl=900, show_spinner="Fetching news feeds...")
