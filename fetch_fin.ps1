@@ -118,7 +118,7 @@ $out = [ordered]@{
     generatedAt = (Get-Date).ToString("yyyy-MM-dd HH:mm")
     recipient   = $cfg.recipient
     subject     = "$($cfg.subjectPrefix) - $((Get-Date).ToString('ddd MMM d'))"
-    snapshot    = @(); snapshotAsOf = ""; reading = @(); history = ""; macro = @()
+    snapshot    = @(); snapshotAsOf = ""; reading = @(); history = ""; macro = @(); bbgBody = ""; wsjBody = ""
     sources     = @(); gaps = @()
 }
 
@@ -131,11 +131,13 @@ foreach ($s in $cfg.sources) {
 
     switch ($s.key) {
         "bloomberg" {
+            $out.bbgBody = $body.Substring(0, [Math]::Min(8000, $body.Length))
             $snap = Parse-Snapshot $body
             $out.snapshot = @($snap.rows); $out.snapshotAsOf = $snap.asOf
             if ($snap.rows.Count -eq 0) { $out.gaps += "Bloomberg: Market Snapshot table not found - layout may have changed." }
         }
         "wsj" {
+            $out.wsjBody = $body.Substring(0, [Math]::Min(8000, $body.Length))
             $out.reading = @(Parse-Reading $body)
             $out.history = Parse-History $body
             if ($out.reading.Count -eq 0) { $out.gaps += "WSJ: 'What I'm Reading' not found." }

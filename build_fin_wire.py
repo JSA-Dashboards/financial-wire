@@ -15,7 +15,7 @@ from datetime import datetime
 from pathlib import Path
 
 HERE = Path(__file__).parent
-SECTION_ORDER = ["history", "snapshot", "futures", "reading", "macro", "headlines"]  # reorder freely
+SECTION_ORDER = ["history", "snapshot", "futures", "five", "reading", "macro", "headlines"]  # reorder freely
 
 INK, ACCENT, MUTED, RULE = "#32373c", "#5e7164", "#5f7267", "#d7e2dc"   # JSA green, as the COT dashboard
 GREEN, RED, AMBER = "#2e7d32", "#c62828", "#b26a00"
@@ -110,12 +110,25 @@ def snapshot(d: dict) -> str:
     return heading("Market Snapshot") + row(f'<table width="100%" cellpadding="0" cellspacing="0">{body}</table>{note}', "6px 0 0 0")
 
 
-def reading(d: dict) -> str:
-    items = d.get("reading") or []
+def _explained(title: str, items: list, expl: list, note: str) -> str:
+    """Bold headline with a PJ-style explanation paragraph under each (when we have one)."""
     if not items:
         return ""
-    lis = "".join(f'<li style="padding:3px 0;">{esc(i)}</li>' for i in items)
-    return heading("What We're Reading") + row(f'<ul style="margin:0;padding-left:20px;">{lis}</ul>')
+    if not expl or len(expl) != len(items):
+        lis = "".join(f'<li style="padding:3px 0;">{esc(i)}</li>' for i in items)
+        return heading(title) + row(f'<ul style="margin:0;padding-left:20px;">{lis}</ul>')
+    ps = "".join(f'<p style="margin:0 0 12px 0;"><b>{esc(i)}</b><br>{esc(x)}</p>' for i, x in zip(items, expl))
+    return heading(title) + row(ps) +         f'<tr><td style="{FONT}font-size:11px;color:{MUTED};">{esc(note)}</td></tr>'
+
+
+def reading(d: dict) -> str:
+    return _explained("What We're Reading", d.get("reading") or [], d.get("reading_x") or [],
+                      "WSJ Markets A.M. headlines; explanations are AI-drafted from the newsletter, verify before relying")
+
+
+def five_things(d: dict) -> str:
+    return _explained("Bloomberg Five Things", d.get("five") or [], d.get("five_x") or [],
+                      "Bloomberg Markets Daily; explanations are AI-drafted from the newsletter, verify before relying")
 
 
 def macro(d: dict) -> str:
@@ -194,7 +207,7 @@ def history(d: dict) -> str:
     return heading("Today in Markets History") + row(esc(h))
 
 
-SECTIONS = {"snapshot": snapshot, "futures": futures, "reading": reading, "macro": macro,
+SECTIONS = {"snapshot": snapshot, "futures": futures, "reading": reading, "five": five_things, "macro": macro,
             "headlines": headlines_section, "history": history}
 
 

@@ -15,6 +15,7 @@ from email.message import EmailMessage
 import streamlit as st
 
 import build_fin_wire
+import explain
 import headlines
 import summarize
 import wire_store
@@ -120,6 +121,11 @@ def fut_tile(r: dict) -> str:
             f'{line("Month", r.get("month"), r.get("month_pct"))}{line("Year", r.get("year"), r.get("year_pct"))}</div>')
 
 
+@st.cache_data(ttl=86400, show_spinner=False, max_entries=50)
+def get_explanations(items: tuple, context: str, source: str) -> list:
+    return explain.explain(list(items), context, source)   # raises on failure, so failures are not cached
+
+
 @st.cache_data(ttl=900, show_spinner="Fetching news feeds...")
 def load_feeds():
     return headlines.collect(include_mailbox=False)
@@ -163,6 +169,25 @@ topics = list(dict.fromkeys(i["topic"] for i in items))
 groups = {t: [i for i in items if i["topic"] == t] for t in topics}
 picked = [it for t in topics for n, it in enumerate(groups[t]) if st.session_state.get(f"{t}-{n}")]
 
+# -- PJ-style explanations under the Bloomberg Five Things and the WSJ reading list ----------
+five = [i["title"] for i in (payloads.get("bbg") or {}).get("data") or [] if i.get("feed") == "Five things"]
+wsj_items = list((wire or {}).get("reading") or [])
+five_x, wsj_x, expl_note = [], [], None
+with st.spinner("Writing the explanations..."):
+    for items_, ctx, src, name in ((five, (wire or {}).get("bbgBody", ""), "Bloomberg Markets Daily", "five"),
+                                   (wsj_items, (wire or {}).get("wsjBody", ""), "WSJ Markets A.M.", "wsj")):
+        if not items_:
+            continue
+        try:
+            x = get_explanations(tuple(items_), ctx, src)
+        except Exception as e:
+            expl_note, x = str(e), []
+        if name == "five":
+            five_x = x
+        else:
+            wsj_x = x
+expl_map = dict(zip(five, five_x)) | dict(zip(wsj_items, wsj_x))
+
 entries = []   # {"title": "Headline (Source)", "summary": "...", "note": None | "..."}
 for p in picked:
     entry = {"title": f"{p['title']} ({p['source']})", "summary": "", "note": None, "basis": ""}
@@ -173,17 +198,21 @@ for p in picked:
                 entry["summary"], entry["basis"] = r["summary"], r["basis"]
             except Exception as e:
                 entry["note"] = str(e)
+    elif p["title"] in expl_map:
+        entry["summary"], entry["basis"] = expl_map[p["title"]], "newsletter (AI-drafted)"
     entries.append(entry)
 
 # -- the wire, full width, with the Outlook button just under it -------------------------
 sec("Today's Wire")
 if wire:
     with st.container(border=True):
-        st.iframe(build_fin_wire.build(dict(wire, headlines=entries, futures=futs)), height=1400)
+        st.iframe(build_fin_wire.build(dict(wire, headlines=entries, futures=futs, five=five, five_x=five_x, reading_x=wsj_x)), height=1400)
     st.download_button(
-        "Create Outlook template", data=outlook_draft(dict(wire, futures=futs), entries, wire.get("recipient", "")),
+        "Create Outlook template", data=outlook_draft(dict(wire, futures=futs, five=five, five_x=five_x, reading_x=wsj_x), entries, wire.get("recipient", "")),
         file_name="Financial News.eml", mime="message/rfc822", icon=":material/mail:", type="primary",
         help="Opens in Outlook as an editable draft, subject 'Financial News', with the wire plus your ticked headlines.")
+    if expl_note and (five or wsj_items):
+        st.caption(f":material/warning: no explanations written: {expl_note}")
 else:
     st.info("No wire yet.")
 
