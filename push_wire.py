@@ -5,10 +5,12 @@ read Outlook, then push the results to Snowflake for the hosted app.
     python push_wire.py --dry      # fetch only, print what would be pushed
 """
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
+import futures_changes
 import headlines
 import wire_store
 
@@ -17,6 +19,7 @@ DRY = "--dry" in sys.argv
 
 
 def main() -> int:
+    wire_store.config()   # loads financial_wire/.env into the environment (Snowflake + MASSIVE_API_KEY)
     subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
                     str(HERE / "fetch_fin.ps1")], check=True, timeout=300)
     wire = json.loads((HERE / "fin_input.json").read_text(encoding="utf-8-sig"))
@@ -29,6 +32,15 @@ def main() -> int:
 
     as_of = wire_store.today_ct()
     payloads = {"wire": wire, "pj": pj, "bbg": bbg}
+    key = os.environ.get("MASSIVE_API_KEY")
+    if key:
+        try:
+            payloads["mkts"] = futures_changes.build(key, as_of)
+            (HERE / "mkts.json").write_text(json.dumps(payloads["mkts"]), encoding="utf-8")
+        except Exception as e:   # a Massive blip must not block the rest of the wire
+            print("FUTURES ERROR:", e)
+    else:
+        print("MASSIVE_API_KEY not set in financial_wire/.env - skipping the futures table.")
     for kind, data in payloads.items():
         n = len(data) if isinstance(data, list) else len(wire.get("macro", [])) + len(wire.get("snapshot", []))
         print(f"{kind:5} {n} item(s)")

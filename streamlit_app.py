@@ -105,6 +105,19 @@ def get_summary(title: str, link: str, source: str, blurb: str) -> dict:
     return r
 
 
+def fut_tile(r: dict) -> str:
+    dec = r.get("decimals", 2)
+
+    def line(label, v):
+        if v is None:
+            return f'<div class="tile-sub">{label} n/a</div>'
+        col = COL_POS if v > 0 else COL_NEG if v < 0 else DM_MUTED
+        return f'<div class="tile-sub">{label} <b style="color:{col}">{v:+.{dec}f}</b></div>'
+    return (f'<div class="tile"><div class="tile-label">{html.escape(r["name"])} · {html.escape(r["ticker"])}</div>'
+            f'<div class="tile-value">{r["last"]:.{dec}f}</div>'
+            f'<div class="tile-sub">{html.escape(r["unit"])}</div>{line("Day", r.get("day"))}{line("Week", r.get("week"))}</div>')
+
+
 @st.cache_data(ttl=900, show_spinner="Fetching news feeds...")
 def load_feeds():
     return headlines.collect(include_mailbox=False)
@@ -129,6 +142,11 @@ else:
         sec("Market snapshot" + (f" · Bloomberg, {wire['snapshotAsOf']}" if wire.get("snapshotAsOf") else ""))
         for col, s in zip(st.columns(len(snap)), snap):
             col.markdown(tile(s["name"], s["level"], s["change"]), unsafe_allow_html=True)
+    futs = (payloads.get("mkts") or {}).get("data") or []
+    if futs:
+        sec(f"Nearby futures · settlements {futs[0].get('asof', '')} · change in contract units")
+        for col, r in zip(st.columns(len(futs)), futs):
+            col.markdown(fut_tile(r), unsafe_allow_html=True)
     for g in wire.get("gaps") or []:
         st.caption(f":material/warning: {g}")
 
@@ -157,9 +175,9 @@ for p in picked:
 sec("Today's wire")
 if wire:
     with st.container(border=True):
-        st.iframe(build_fin_wire.build(dict(wire, headlines=entries)), height=1400)
+        st.iframe(build_fin_wire.build(dict(wire, headlines=entries, futures=futs)), height=1400)
     st.download_button(
-        "Create Outlook template", data=outlook_draft(wire, entries, wire.get("recipient", "")),
+        "Create Outlook template", data=outlook_draft(dict(wire, futures=futs), entries, wire.get("recipient", "")),
         file_name="Financial News.eml", mime="message/rfc822", icon=":material/mail:", type="primary",
         help="Opens in Outlook as an editable draft, subject 'Financial News', with the wire plus your ticked headlines.")
 else:

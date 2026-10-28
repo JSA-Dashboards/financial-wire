@@ -15,7 +15,7 @@ from pathlib import Path
 
 HERE = Path(__file__).parent
 KEYS = ("account", "user", "role", "warehouse", "database", "schema", "private_key", "private_key_path")
-KINDS = ("wire", "pj", "bbg")
+KINDS = ("wire", "pj", "bbg", "mkts")
 
 
 def today_ct() -> date:
@@ -98,10 +98,10 @@ def _read_local():
         raw = p.read_text(encoding="utf-8-sig").strip()
         return json.loads(raw) if raw else []
     out = {}
-    for kind, name in (("wire", "fin_input.json"), ("pj", "pj_candidates.json"), ("bbg", "bbg_candidates.json")):
+    for kind, name in (("wire", "fin_input.json"), ("pj", "pj_candidates.json"), ("bbg", "bbg_candidates.json"), ("mkts", "mkts.json")):
         d = rd(name)
         if d is not None:
-            if kind != "wire":   # local files are the raw rows; the app wants headline-shaped items
+            if kind in ("pj", "bbg"):   # local files are the raw rows; the app wants headline-shaped items
                 d = _as_items(kind, d)
             out[kind] = {"as_of": None, "pushed_at": datetime.fromtimestamp((HERE / name).stat().st_mtime), "data": d}
     return out
