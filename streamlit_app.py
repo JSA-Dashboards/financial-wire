@@ -1,20 +1,88 @@
 """Morning Financial Wire - hosted view.
 
 Shows today's wire (snapshot, reading list, macro read, history) and the
-headline-candidate picker. Nothing here writes into the wire: ticking items only
-builds a copy-ready bullet list for you to rewrite.
+headline-candidate picker. Nothing here writes into the wire on its own: ticking
+items only builds a bullet list, and the "Outlook draft" download adds those
+bullets to a copy of the wire for you to edit and send.
 
 Email-sourced content arrives from Snowflake (push_wire.py on your PC). The
 public news feeds are fetched live. With no Snowflake config it reads the local
 files, so `streamlit run streamlit_app.py` works on your PC too.
 """
+import html
+from email.message import EmailMessage
+
 import streamlit as st
 
 import build_fin_wire
 import headlines
 import wire_store
 
-st.set_page_config(page_title="Morning Financial Wire", page_icon=":material/newspaper:", layout="centered")
+st.set_page_config(page_title="Morning Financial Wire", page_icon=":material/newspaper:", layout="wide")
+
+# -- palette: same as the CFTC COT dashboard ------------------------------------
+JSA_GREEN = "#5e7164"
+DM_BG, DM_SURFACE, DM_BORDER = "#f6f8f7", "#ffffff", "#d7e2dc"
+DM_TEXT, DM_MUTED = "#32373c", "#5f7267"
+COL_POS, COL_NEG = "#16a34a", "#dc2626"
+
+st.markdown(f"""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=EB+Garamond:wght@500;600&family=Source+Sans+3:wght@400;600;700&display=swap');
+html, body, [data-testid="stAppViewContainer"] {{ background-color:{DM_BG}; color:{DM_TEXT}; }}
+html, body, p, span, div, label, button, td, th {{ font-family:'Source Sans 3','Source Sans Pro',sans-serif; }}
+.block-container {{ padding-top: 3.2rem; max-width: 1400px; }}
+.dash-header {{ display:flex; align-items:center; gap:18px; padding-bottom:10px;
+    border-bottom:1px solid {DM_BORDER}; margin-bottom:14px; }}
+.dash-header img {{ height:40px; }}
+.dash-header .t b {{ font-family:'EB Garamond',Georgia,serif; font-size:1.7rem; color:{DM_TEXT}; font-weight:600; }}
+.dash-header .t div {{ font-size:.85rem; color:{DM_MUTED}; }}
+@media (max-width: 640px) {{ .dash-header img {{ display:none; }} }}
+.tile {{ background:{DM_SURFACE}; border:1px solid {DM_BORDER}; border-top:3px solid {JSA_GREEN};
+    border-radius:10px; padding:14px 16px; text-align:center; height:100%; }}
+.tile-label {{ color:{DM_MUTED}; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.09em; margin-bottom:6px; }}
+.tile-value {{ color:{DM_TEXT}; font-size:1.4rem; font-weight:700; line-height:1.1; }}
+.tile-delta {{ font-size:0.9rem; font-weight:700; margin-top:4px; }}
+.sec-header {{ color:{DM_MUTED}; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.1em;
+    padding:10px 0 4px; border-bottom:1px solid {DM_BORDER}; margin-bottom:12px; }}
+.asof {{ background:{DM_SURFACE}; border:1px solid {DM_BORDER}; border-radius:8px; padding:10px 16px;
+    color:{DM_MUTED}; font-size:0.82rem; margin-bottom:12px; }}
+.asof b {{ color:{DM_TEXT}; }}
+hr {{ border-color:{DM_BORDER}; }}
+#MainMenu, footer {{ visibility:hidden; }}
+.stDeployButton {{ display:none; }}
+</style>
+<div class="dash-header">
+  <img src="https://www.jpsi.com/wp-content/themes/gate39media/img/logo-full.png">
+  <div class="t"><b>Morning Financial Wire</b>
+  <div>Markets and news that move grains, biofuels and livestock &middot; John Stewart &amp; Associates</div></div>
+</div>
+""", unsafe_allow_html=True)
+
+
+def sec(text: str):
+    st.markdown(f'<div class="sec-header">{html.escape(text)}</div>', unsafe_allow_html=True)
+
+
+def tile(name: str, level: str, change: str) -> str:
+    col = build_fin_wire.change_color(name, change)
+    col = COL_POS if col == build_fin_wire.GREEN else COL_NEG
+    return (f'<div class="tile"><div class="tile-label">{html.escape(name)}</div>'
+            f'<div class="tile-value">{html.escape(level)}</div>'
+            f'<div class="tile-delta" style="color:{col}">{html.escape(change)}</div></div>')
+
+
+def outlook_draft(wire: dict, picked: list[str], recipient: str) -> bytes:
+    """An .eml flagged X-Unsent: Outlook opens it as an editable draft, subject 'Financial News'."""
+    data = dict(wire, headlines=picked)
+    msg = EmailMessage()
+    msg["Subject"] = "Financial News"
+    if recipient:
+        msg["To"] = recipient
+    msg["X-Unsent"] = "1"
+    msg.set_content("Open this message in an HTML-capable mail client.")
+    msg.add_alternative(build_fin_wire.build(data), subtype="html")
+    return msg.as_bytes()
 
 
 @st.cache_data(ttl=300, show_spinner="Loading the wire...")
@@ -27,29 +95,28 @@ def load_feeds():
     return headlines.collect(include_mailbox=False)
 
 
-st.title("Morning financial wire")
-
 payloads, origin = load_payloads()
 wire = (payloads.get("wire") or {}).get("data")
-
-meta = payloads.get("wire") or {}
-stamp = meta.get("pushed_at")
-st.caption(f"Source: {origin}" + (f" · email items pushed {stamp:%a %b %d %H:%M}" if stamp else ""))
+stamp = (payloads.get("wire") or {}).get("pushed_at")
+st.markdown(f'<div class="asof">Source: <b>{html.escape(origin)}</b>'
+            + (f" &middot; email items pushed <b>{stamp:%a %b %d %H:%M}</b>" if stamp else "") + "</div>",
+            unsafe_allow_html=True)
 
 if not wire:
     st.warning("No wire data yet. Run push_wire.py on the PC that has Outlook.")
 else:
-    with st.container(border=True):
-        st.iframe(build_fin_wire.build(wire), height=1400)
+    snap = wire.get("snapshot") or []
+    if snap:
+        sec("Market snapshot" + (f" · Bloomberg, {wire['snapshotAsOf']}" if wire.get("snapshotAsOf") else ""))
+        for col, s in zip(st.columns(len(snap)), snap):
+            col.markdown(tile(s["name"], s["level"], s["change"]), unsafe_allow_html=True)
     for g in wire.get("gaps") or []:
         st.caption(f":material/warning: {g}")
-
-st.header("Headline candidates")
-st.caption("Tick what matters, copy the list, paste into the wire's Headlines box and rewrite it in your own words.")
 
 
 @st.fragment
 def picker():
+    """Ticking reruns only this fragment, not the whole page."""
     feed_items, feed_errors = load_feeds()
     items = list((payloads.get("pj") or {}).get("data") or []) + \
         list((payloads.get("bbg") or {}).get("data") or []) + feed_items
@@ -69,11 +136,26 @@ def picker():
                 if st.checkbox(label + link + tail, key=f"{t}-{n}"):
                     picked.append(it)
 
-    st.subheader(f"Ticked ({len(picked)})")
-    if picked:
-        st.code("\n".join(f"• {p['title']} ({p['source']})" for p in picked), language=None, wrap_lines=True)
+    sec(f"Ticked ({len(picked)})")
+    bullets = [f"{p['title']} ({p['source']})" for p in picked]
+    if bullets:
+        st.code("\n".join(f"• {b}" for b in bullets), language=None, wrap_lines=True)
+    if wire:
+        st.download_button(
+            "Outlook draft: Financial News", data=outlook_draft(wire, bullets, (wire or {}).get("recipient", "")),
+            file_name="Financial News.eml", mime="message/rfc822", icon=":material/mail:", type="primary",
+            help="Opens in Outlook as an editable draft with the wire plus your ticked headlines.")
     for e in feed_errors:
         st.caption(f":material/warning: feed failed: {e}")
 
 
-picker()
+left, right = st.columns([5, 6], gap="large")
+with left:
+    sec("Today's wire")
+    if wire:
+        with st.container(border=True):
+            st.iframe(build_fin_wire.build(wire), height=1400)
+with right:
+    sec("Headline candidates")
+    st.caption("Tick what matters. Copy the list, or download the Outlook draft with it already in the wire.")
+    picker()

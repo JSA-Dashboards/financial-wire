@@ -15,9 +15,9 @@ from datetime import datetime
 from pathlib import Path
 
 HERE = Path(__file__).parent
-SECTION_ORDER = ["snapshot", "reading", "macro", "history"]  # reorder freely
+SECTION_ORDER = ["snapshot", "reading", "macro", "headlines", "history"]  # reorder freely
 
-INK, ACCENT, MUTED, RULE = "#32373c", "#0693e3", "#6b7280", "#d9dde1"
+INK, ACCENT, MUTED, RULE = "#32373c", "#5e7164", "#5f7267", "#d7e2dc"   # JSA green, as the COT dashboard
 GREEN, RED, AMBER = "#2e7d32", "#c62828", "#b26a00"
 FONT = "font-family:Arial,Helvetica,sans-serif;"
 
@@ -78,6 +78,15 @@ def macro(d: dict) -> str:
         f'<tr><td style="{FONT}font-size:11px;color:{MUTED};">PJ Quaid, StoneX</td></tr>'
 
 
+def headlines_section(d: dict) -> str:
+    """Ticked headline candidates, passed in by the app (never read from a feed here)."""
+    items = d.get("headlines") or []
+    if not items:
+        return ""
+    lis = "".join(f'<li style="padding:3px 0;">{esc(i)}</li>' for i in items)
+    return heading("Headlines") + row(f'<ul style="margin:0;padding-left:20px;">{lis}</ul>')
+
+
 def history(d: dict) -> str:
     h = d.get("history")
     if not h:
@@ -85,7 +94,8 @@ def history(d: dict) -> str:
     return heading("Today in Markets History") + row(esc(h))
 
 
-SECTIONS = {"snapshot": snapshot, "reading": reading, "macro": macro, "history": history}
+SECTIONS = {"snapshot": snapshot, "reading": reading, "macro": macro,
+            "headlines": headlines_section, "history": history}
 
 
 def build(d: dict) -> str:
