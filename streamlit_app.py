@@ -145,8 +145,10 @@ else:
     futs = (payloads.get("mkts") or {}).get("data") or []
     if futs:
         sec(f"Nearby futures · settlements {futs[0].get('asof', '')} · change in contract units")
-        for col, r in zip(st.columns(len(futs)), futs):
-            col.markdown(fut_tile(r), unsafe_allow_html=True)
+        for i in range(0, len(futs), 5):   # five tiles a row; 9 in one row is too narrow to read
+            chunk = futs[i:i + 5]
+            for col, r in zip(st.columns(5), chunk):
+                col.markdown(fut_tile(r), unsafe_allow_html=True)
     for g in wire.get("gaps") or []:
         st.caption(f":material/warning: {g}")
 
