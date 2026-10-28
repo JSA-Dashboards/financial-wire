@@ -43,7 +43,16 @@ def config():
         except Exception:
             pass
     ok = c.get("account") and c.get("user") and (c.get("private_key") or c.get("private_key_path"))
-    return c if ok else None
+    if not ok:
+        # Inside the admin portal: reuse its Snowflake service account (SNOWFLAKE_* env, bridged from the
+        # portal's secrets) against the FIN_WIRE database. Its role needs SELECT on FIN_WIRE.PUBLIC.
+        e = os.environ
+        if e.get("SNOWFLAKE_ACCOUNT") and e.get("SNOWFLAKE_USER") and e.get("SNOWFLAKE_PRIVATE_KEY"):
+            return {"account": e["SNOWFLAKE_ACCOUNT"], "user": e["SNOWFLAKE_USER"],
+                    "role": e.get("SNOWFLAKE_ROLE"), "warehouse": e.get("SNOWFLAKE_WAREHOUSE"),
+                    "database": "FIN_WIRE", "schema": "PUBLIC", "private_key": e["SNOWFLAKE_PRIVATE_KEY"]}
+        return None
+    return c
 
 
 def _connect(c):

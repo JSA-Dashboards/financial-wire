@@ -76,7 +76,7 @@ def api_key():
         return k
     try:
         import streamlit as st
-        return st.secrets.get("anthropic", {}).get("api_key")
+        return st.secrets.get("anthropic", {}).get("api_key") or st.secrets.get("ANTHROPIC_API_KEY")
     except Exception:
         return None
 
