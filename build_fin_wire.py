@@ -151,7 +151,7 @@ def build(d: dict) -> str:
 <html><head><meta charset="utf-8"><title>{esc(d.get('subject',''))}</title></head>
 <body style="margin:0;padding:0;background:#ffffff;">
 <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="left">
-<table width="640" cellpadding="0" cellspacing="0" style="width:640px;max-width:100%;">
+<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;">
 <tr><td style="padding:20px 0 4px 0;{FONT}font-size:24px;font-weight:bold;color:{INK};">Morning Financial Wire</td></tr>
 <tr><td style="{FONT}font-size:13px;color:{MUTED};">{esc(today)}</td></tr>
 {parts}
