@@ -129,5 +129,8 @@ def read_latest():
     """-> (payloads_by_kind, origin) where origin is 'snowflake' or 'local files'."""
     c = config()
     if c:
-        return _read_snowflake(c), "snowflake"
+        try:
+            return _read_snowflake(c), "snowflake"
+        except Exception as e:   # a bad key or missing grant should read as a notice, not a stack trace
+            return {}, f"snowflake unavailable ({type(e).__name__}: {str(e)[:120]})"
     return _read_local(), "local files"
