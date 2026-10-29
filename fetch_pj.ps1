@@ -22,11 +22,10 @@ function Clean([string]$t) {
 }
 
 $o = New-Object -ComObject Outlook.Application
-$all = $o.GetNamespace("MAPI").GetDefaultFolder(6).Items
-$all.Sort("[ReceivedTime]", $true)
-$cut = (Get-Date).AddHours(-$Hours).ToString("MM/dd/yyyy hh:mm tt")
+. "$PSScriptRoot\outlook_mail.ps1"
+$cut = (Get-Date).AddHours(-$Hours)
 $rows = @()
-foreach ($m in $all.Restrict("[ReceivedTime] >= '$cut'")) {
+foreach ($m in (Get-RecentMail $o $cut)) {
     try {
         if ("$($m.SenderName) $($m.SenderEmailAddress)" -notlike "*$Match*") { continue }
         foreach ($ln in ((Clean $m.Body) -split "`n")) {

@@ -91,10 +91,8 @@ if ($MsgDir) {
 } else {
     if ($Hours -le 0) { $Hours = if ((Get-Date).DayOfWeek -eq "Monday") { 72 } else { 24 } }
     $cutoff = (Get-Date).AddHours(-$Hours)
-    $all = $outlook.GetNamespace("MAPI").GetDefaultFolder(6).Items
-    $all.Sort("[ReceivedTime]", $true)
-    $items = $all.Restrict("[ReceivedTime] >= '" + $cutoff.ToString("MM/dd/yyyy hh:mm tt") + "'")
-    foreach ($i in $items) { $msgs += $i }
+    . "$PSScriptRoot\outlook_mail.ps1"
+    $msgs += Get-RecentMail $outlook $cutoff
 }
 
 $found = @{}

@@ -12,11 +12,10 @@ $ErrorActionPreference = "Stop"
 if ($Hours -le 0) { $Hours = if ((Get-Date).DayOfWeek -eq "Monday") { 72 } else { 30 } }
 
 $o = New-Object -ComObject Outlook.Application
-$all = $o.GetNamespace("MAPI").GetDefaultFolder(6).Items
-$all.Sort("[ReceivedTime]", $true)
-$cut = (Get-Date).AddHours(-$Hours).ToString("MM/dd/yyyy hh:mm tt")
+. "$PSScriptRoot\outlook_mail.ps1"
+$cut = (Get-Date).AddHours(-$Hours)
 $msg = $null
-foreach ($m in $all.Restrict("[ReceivedTime] >= '$cut'")) {
+foreach ($m in (Get-RecentMail $o $cut)) {
     try {
         if ("$($m.SenderEmailAddress)" -like "*news.bloomberg.com*" -and $m.Subject -match 'Markets Daily') { $msg = $m; break }
     } catch {}
