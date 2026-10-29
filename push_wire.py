@@ -16,10 +16,30 @@ import wire_store
 
 HERE = Path(__file__).parent
 DRY = "--dry" in sys.argv
+SCHEDULED = "--scheduled" in sys.argv
+TRIED = HERE / ".last_scheduled_try"   # stops a failing pull from retrying every 10 minutes
+
+
+def should_run() -> bool:
+    """--scheduled runs every 10 minutes through the morning: do the full pull at the first run
+    (4:00 AM Central) and afterwards only when the app's Refresh button has asked for one."""
+    import time
+    from datetime import datetime
+    now = wire_store.ct_now()
+    if now.hour == 4 and now.minute < 10:
+        return True
+    if not wire_store.refresh_pending():
+        return False
+    if TRIED.exists() and time.time() - TRIED.stat().st_mtime < 1800:
+        return False   # tried within 30 min and the request is still open: the pull is failing, don't hammer Outlook
+    TRIED.write_text(now.isoformat())
+    return True
 
 
 def main() -> int:
     wire_store.config()   # loads financial_wire/.env into the environment (Snowflake + MASSIVE_API_KEY)
+    if SCHEDULED and not should_run():
+        return 0
     subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
                     str(HERE / "fetch_fin.ps1")], check=True, timeout=300)
     wire = json.loads((HERE / "fin_input.json").read_text(encoding="utf-8-sig"))
