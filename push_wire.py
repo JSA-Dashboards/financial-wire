@@ -3,6 +3,8 @@ read Outlook, then push the results to Snowflake for the hosted app.
 
     python push_wire.py            # fetch + push
     python push_wire.py --dry      # fetch only, print what would be pushed
+    python push_wire.py --clean    # 4:00 AM: wipe yesterday (nothing is pulled)
+    python push_wire.py --scheduled  # 6:30-8:30 AM task: full pull to 7:10, then only on a Refresh request
 """
 import json
 import os
@@ -17,16 +19,16 @@ import wire_store
 HERE = Path(__file__).parent
 DRY = "--dry" in sys.argv
 SCHEDULED = "--scheduled" in sys.argv
+CLEAN = "--clean" in sys.argv
 TRIED = HERE / ".last_scheduled_try"   # stops a failing pull from retrying every 10 minutes
 
 
 def should_run() -> bool:
-    """--scheduled runs every 10 minutes through the morning: do the full pull at the first run
-    (4:00 AM Central) and afterwards only when the app's Refresh button has asked for one."""
+    """--scheduled fires every 10 minutes from 6:30 AM Central. Through 7:10 every run is a full pull
+    (the emails land one by one); after that only when the app's Refresh button has asked for one."""
     import time
-    from datetime import datetime
     now = wire_store.ct_now()
-    if now.hour == 4 and now.minute < 10:
+    if 6 * 60 + 30 <= now.hour * 60 + now.minute <= 7 * 60 + 14:
         return True
     if not wire_store.refresh_pending():
         return False
@@ -36,8 +38,21 @@ def should_run() -> bool:
     return True
 
 
+def clean_slate() -> int:
+    """4:00 AM: drop everything saved for yesterday, here and in Snowflake. Pulls nothing."""
+    n = wire_store.clear_all()
+    for name in ("fin_input.json", "pj_candidates.json", "bbg_candidates.json", "mkts.json",
+                 "headline_candidates.json", "headline_candidates.html", "fin_output.html"):
+        (HERE / name).unlink(missing_ok=True)
+    TRIED.unlink(missing_ok=True)
+    print(f"Clean slate: removed {n} saved row(s) from Snowflake and the local copies.")
+    return 0
+
+
 def main() -> int:
     wire_store.config()   # loads financial_wire/.env into the environment (Snowflake + MASSIVE_API_KEY)
+    if CLEAN:
+        return clean_slate()
     if SCHEDULED and not should_run():
         return 0
     subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
