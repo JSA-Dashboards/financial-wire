@@ -4,7 +4,7 @@ read Outlook, then push the results to Snowflake for the hosted app.
     python push_wire.py            # fetch + push
     python push_wire.py --dry      # fetch only, print what would be pushed
     python push_wire.py --clean    # 12:01 AM: wipe the previous day (nothing is pulled)
-    python push_wire.py --scheduled  # 5:30-8:30 AM task, every 30 min: full pulls to 7:10, then only on a Refresh request
+    python push_wire.py --scheduled  # 5:30-8:30 AM task, every 15 min: full pulls to 7:10, then only on a Refresh request
 """
 import json
 import os
@@ -20,11 +20,11 @@ HERE = Path(__file__).parent
 DRY = "--dry" in sys.argv
 SCHEDULED = "--scheduled" in sys.argv
 CLEAN = "--clean" in sys.argv
-TRIED = HERE / ".last_scheduled_try"   # stops a failing pull from retrying every 30 minutes
+TRIED = HERE / ".last_scheduled_try"   # stops a failing pull from retrying every 15 minutes
 
 
 def should_run() -> bool:
-    """--scheduled fires every 30 minutes from 5:30 AM Central. Through 7:10 every run is a full pull
+    """--scheduled fires every 15 minutes from 5:30 AM Central. Through 7:10 every run is a full pull
     (the emails land one by one); after that only when the app's Refresh button has asked for one."""
     import time
     now = wire_store.ct_now()
