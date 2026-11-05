@@ -3,8 +3,8 @@ read Outlook, then push the results to Snowflake for the hosted app.
 
     python push_wire.py            # fetch + push
     python push_wire.py --dry      # fetch only, print what would be pushed
-    python push_wire.py --clean    # 4:00 AM: wipe yesterday (nothing is pulled)
-    python push_wire.py --scheduled  # 5:30-8:30 AM task: full pull to 7:10, then only on a Refresh request
+    python push_wire.py --clean    # 12:01 AM: wipe the previous day (nothing is pulled)
+    python push_wire.py --scheduled  # 5:30-8:30 AM task, every 30 min: full pulls to 7:10, then only on a Refresh request
 """
 import json
 import os
@@ -20,11 +20,11 @@ HERE = Path(__file__).parent
 DRY = "--dry" in sys.argv
 SCHEDULED = "--scheduled" in sys.argv
 CLEAN = "--clean" in sys.argv
-TRIED = HERE / ".last_scheduled_try"   # stops a failing pull from retrying every 10 minutes
+TRIED = HERE / ".last_scheduled_try"   # stops a failing pull from retrying every 30 minutes
 
 
 def should_run() -> bool:
-    """--scheduled fires every 10 minutes from 5:30 AM Central. Through 7:10 every run is a full pull
+    """--scheduled fires every 30 minutes from 5:30 AM Central. Through 7:10 every run is a full pull
     (the emails land one by one); after that only when the app's Refresh button has asked for one."""
     import time
     now = wire_store.ct_now()
@@ -33,13 +33,13 @@ def should_run() -> bool:
     if not wire_store.refresh_pending():
         return False
     if TRIED.exists() and time.time() - TRIED.stat().st_mtime < 1800:
-        return False   # tried within 30 min and the request is still open: the pull is failing, don't hammer Outlook
+        return False   # tried within 30 min and the request is still open: the pull is failing, do not hammer Outlook
     TRIED.write_text(now.isoformat())
     return True
 
 
 def clean_slate() -> int:
-    """4:00 AM: drop everything saved for yesterday, here and in Snowflake. Pulls nothing."""
+    """12:01 AM: drop everything saved for the day that just ended, here and in Snowflake. Pulls nothing."""
     n = wire_store.clear_all()
     for name in ("fin_input.json", "pj_candidates.json", "bbg_candidates.json", "mkts.json",
                  "headline_candidates.json", "headline_candidates.html", "fin_output.html"):
