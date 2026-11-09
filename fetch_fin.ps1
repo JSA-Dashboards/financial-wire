@@ -104,6 +104,11 @@ foreach ($msg in $msgs) {
             if ($from -notlike "*$($s.match)*") { continue }
             $ok = $false
             foreach ($p in $s.subjectAny) { if ($subj -match $p) { $ok = $true; break } }
+            # WSJ's subject is the day's headline ("Boeing and the Trouble with Timing Turnarounds"), so the
+            # newsletter is also recognised by its sender name ("WSJ Markets A.M.", "Spencer Jakab, WSJ").
+            if (-not $ok -and $s.PSObject.Properties.Name -contains 'senderNameAny') {
+                foreach ($p in $s.senderNameAny) { if ([string]$msg.SenderName -match $p) { $ok = $true; break } }
+            }
             if (-not $ok) { continue }
             $prev = $found[$s.key]
             if ($null -eq $prev -or $msg.ReceivedTime -gt $prev.ReceivedTime) { $found[$s.key] = $msg }
